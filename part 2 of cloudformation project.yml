@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  deploy stack to setup apache ec2 instance while referencing the SampleNetworkCrossStack stack
+
+Parameters: 
+  ImageID:
+    Description: Provide an instance image ID
+    Type: String
+    Default: 'ami-0ccea833bf267252a'
+  InstanceType:
+    Description: Provide an instance type (has default, AllowedValues)
+    Type: String
+    AllowedValues: # choose between all t2 category 
+      - t2.large
+      - t2.nano
+      - t2.micro
+      - t2.small
+      - t2.xlarge
+      - t2.2xlarge
+      - t2.medium
+
+
+  KeyName:
+    Description: KeyPair Name
+    Type: AWS::EC2::KeyPair::KeyName
+ 
+    
+  # KeyName: 
+  #   Description: Keypair in us-west-2 region
+  #   Type: String
+  #   Default: "mini-project-keypair-uswest2"
+
+Mappings:
+ RegionMap: # Name of the mapping 
+   us-west-1: # Top level key
+    "AMI": "ami-073e64e4c237c08ad" # N.Califonia second level key 
+   us-west-2:
+    "AMI": "ami-0ccea833bf267252a" # Oregon
+   us-east-1:
+    "AMI": "ami-04cb4ca688797756f" # N.Viginaia
+   us-east-2:
+    "AMI": "ami-01103fb68b3569475" # Ohio
+
+
+Resources: 
+  myEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref AWS::Region, "AMI"]
+      InstanceType: !Ref InstanceType
+      Monitoring: true
+      SecurityGroupIds: 
+        - !ImportValue SampleNetworkCrossStack-SecurityGroupID
+      SubnetId: !ImportValue 'SampleNetworkCrossStack-SubnetID'
+      KeyName: !Ref KeyName
+      AvailabilityZone: "us-west-2a"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<html><body><h1>WELCOME TO CLOUDFORMATION</h1><br>You successfully access Nnadiekwe Chiderah David web page launched via a CloudFormation template in ${AWS::Region} region</h1></body></html>" > /var/www/html/index.html
+      Tags:
+        - Key: "Name"
+          Value: "MyEc2InstanceProject"
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties: 
+      InstanceId: !Ref myEC2Instance
+      Tags: 
+        - Key: "Name"
+          Value: "MyElasticIP"
+
+Outputs:
+  PrivateIpAddress: 
+    Description: Private IP V4 addresses
+    Value: !GetAtt myEC2Instance.PrivateIp
+
+  PrivateIPDNSName:
+    Description: Outputs the DNS name of the Instance
+    Value: !GetAtt myEC2Instance.PrivateDnsName
+
+  PublicIPDNSName:
+    Description: Outputs the public DNS Name
+    Value: !GetAtt myEC2Instance.PublicDnsName
